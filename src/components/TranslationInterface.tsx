@@ -8,11 +8,12 @@ import SettingsPanel from "./SettingsPanel";
 
 interface TranslationInterfaceProps {
   language: string;
+  onBack: () => void;
 }
 
 const demoWords = ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"];
 
-const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
+const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const demoIndex = useRef(0);
@@ -42,10 +43,6 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
 
   const handleSwitchCamera = () => {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
-  };
-
-  const handleBack = () => {
-    window.location.reload();
   };
 
   // Apply dark mode to the whole page; the theme variables live under `.dark` in index.css.
@@ -78,7 +75,7 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-6 flex items-center justify-between">
         <Button
-          onClick={handleBack}
+          onClick={onBack}
           variant="outline"
           size="lg"
           className="shadow-soft hover:shadow-medium transition-smooth"

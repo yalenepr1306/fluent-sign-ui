@@ -15,7 +15,7 @@ const Index = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("english");
 
   if (started) {
-    return <TranslationInterface language={selectedLanguage} />;
+    return <TranslationInterface language={selectedLanguage} onBack={() => setStarted(false)} />;
   }
 
   return (

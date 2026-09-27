@@ -1,7 +1,15 @@
-import { Volume2, Copy, CheckCircle } from "lucide-react";
+import { Volume2, Copy, CheckCircle, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  languageNames,
+  pickVoice,
+  speechLangs,
+  speechPitches,
+  speechRates,
+  splitSentences,
+} from "@/lib/speech";
 
 interface TextOutputProps {
   text: string;
@@ -11,25 +19,35 @@ interface TextOutputProps {
   voicePitch: string;
 }
 
-const speechLangs: Record<string, string> = {
-  english: "en-US",
-  hindi: "hi-IN",
-  tamil: "ta-IN",
-  spanish: "es-ES",
-};
-
-const speechRates: Record<string, number> = { slow: 0.75, normal: 1, fast: 1.5 };
-const speechPitches: Record<string, number> = { low: 0.7, normal: 1, high: 1.4 };
-
 const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: TextOutputProps) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  // Keeps queued utterances referenced; Chrome can drop events for ones that get garbage collected.
+  const utterances = useRef<SpeechSynthesisUtterance[]>([]);
   const { toast } = useToast();
   const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  // Browsers load their voice list asynchronously, so listen for it to arrive.
+  useEffect(() => {
+    if (!speechSupported) return;
+    const synth = window.speechSynthesis;
+    const update = () => setVoices(synth.getVoices());
+    update();
+    synth.addEventListener?.("voiceschanged", update);
+    return () => synth.removeEventListener?.("voiceschanged", update);
+  }, [speechSupported]);
+
+  const stopSpeaking = () => {
+    if (speechSupported) window.speechSynthesis.cancel();
+    utterances.current = [];
+    setIsSpeaking(false);
+  };
 
   // Stop speaking when the text is cleared or the screen is left.
   useEffect(() => {
     if (!speechSupported || text) return;
     window.speechSynthesis.cancel();
+    utterances.current = [];
     setIsSpeaking(false);
   }, [text, speechSupported]);
 
@@ -50,14 +68,56 @@ const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: Text
       return;
     }
 
+    const synth = window.speechSynthesis;
+    const langTag = speechLangs[language] ?? "en-US";
+    const available = voices.length ? voices : synth.getVoices();
+    const voice = pickVoice(available, langTag);
+
+    // With a voice list but no voice for this language, the browser would stay silent.
+    if (available.length && !voice) {
+      toast({
+        title: `No ${languageNames[language] ?? language} voice on this device`,
+        description: "Install one in your system's speech or language settings, or try Chrome or Edge.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Clear anything queued and un-pause the engine; Chrome can get stuck paused.
+    synth.cancel();
+    synth.resume();
+
+    const sentences = splitSentences(text);
+    const queue = sentences.map((sentence, i) => {
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.lang = langTag;
+      if (voice) utterance.voice = voice;
+      utterance.rate = speechRates[voiceSpeed] ?? 1;
+      utterance.pitch = speechPitches[voicePitch] ?? 1;
+      if (i === sentences.length - 1) {
+        utterance.onend = () => {
+          utterances.current = [];
+          setIsSpeaking(false);
+        };
+      }
+      utterance.onerror = (event) => {
+        utterances.current = [];
+        setIsSpeaking(false);
+        // Cancelling (Stop, Clear, Back) also reports an error; that one is expected.
+        if (event.error !== "canceled" && event.error !== "interrupted") {
+          toast({
+            title: "Couldn't read the text aloud",
+            description: `The browser reported: ${event.error}`,
+            variant: "destructive",
+          });
+        }
+      };
+      return utterance;
+    });
+
+    utterances.current = queue;
     setIsSpeaking(true);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = speechLangs[language] ?? "en-US";
-    utterance.rate = speechRates[voiceSpeed] ?? 1;
-    utterance.pitch = speechPitches[voicePitch] ?? 1;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    queue.forEach((utterance) => synth.speak(utterance));
   };
 
   const handleCopy = async () => {
@@ -116,13 +176,22 @@ const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: Text
       <div className="p-4 border-t bg-muted/30">
         <div className="flex gap-3">
           <Button
-            onClick={handleSpeak}
-            disabled={!text || isSpeaking}
+            onClick={isSpeaking ? stopSpeaking : handleSpeak}
+            disabled={!text}
             size="lg"
             className="flex-1 gradient-primary shadow-soft hover:shadow-medium transition-smooth"
           >
-            <Volume2 className="w-5 h-5 mr-2" />
-            {isSpeaking ? "Speaking..." : "Speak"}
+            {isSpeaking ? (
+              <>
+                <Square className="w-5 h-5 mr-2" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-5 h-5 mr-2" />
+                Speak
+              </>
+            )}
           </Button>
           <Button
             onClick={handleCopy}

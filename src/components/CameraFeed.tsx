@@ -1,16 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, CameraOff } from "lucide-react";
+import { Camera, CameraOff, Hand, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useHandTracking, type HandFrame } from "@/hooks/use-hand-tracking";
+import { gestures, phraseFor, type GestureId } from "@/lib/gestures";
 
 interface CameraFeedProps {
   confidence: number;
   isActive: boolean;
   facingMode: "user" | "environment";
+  language: string;
+  liveGesture: GestureId | null;
+  handPresent: boolean;
+  onHandFrame: (frame: HandFrame) => void;
 }
 
-const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
+const CameraFeed = ({
+  confidence,
+  isActive,
+  facingMode,
+  language,
+  liveGesture,
+  handPresent,
+  onHandFrame,
+}: CameraFeedProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const trackingStatus = useHandTracking(videoRef, canvasRef, isActive && streaming && !error, onHandFrame);
+  const live = gestures.find((g) => g.id === liveGesture);
 
   // Open the camera while active; stop every track when paused, switched or unmounted.
   useEffect(() => {
@@ -37,6 +55,7 @@ const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
         if (video) {
           video.srcObject = mediaStream;
         }
+        setStreaming(true);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -52,6 +71,7 @@ const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
 
     return () => {
       cancelled = true;
+      setStreaming(false);
       stream?.getTracks().forEach((track) => track.stop());
       if (video) {
         video.srcObject = null;
@@ -78,7 +98,7 @@ const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
       </div>
 
       {/* Camera Display Area */}
-      <div className="relative aspect-video bg-muted flex items-center justify-center">
+      <div className="relative aspect-[4/3] sm:aspect-video bg-muted flex items-center justify-center">
         {isActive && error ? (
           <div className="text-center p-8">
             <CameraOff className="w-16 h-16 text-destructive mx-auto mb-4" />
@@ -86,17 +106,38 @@ const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
           </div>
         ) : isActive ? (
           <div className="relative w-full h-full bg-black">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`w-full h-full object-cover ${facingMode === "user" ? "-scale-x-100" : ""}`}
-            />
-            <div className="absolute bottom-4 left-4 right-4 bg-card/95 backdrop-blur rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Gesture Detection</span>
-                <span className="text-sm font-bold text-primary">{confidence.toFixed(1)}%</span>
+            {/* Video and landmark overlay share one mirrored box so the drawing lines up. */}
+            <div className={`absolute inset-0 ${facingMode === "user" ? "-scale-x-100" : ""}`}>
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+
+            {/* Tracking status */}
+            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 flex items-center gap-2 bg-card/95 backdrop-blur rounded-full px-3 py-1.5 text-sm font-medium">
+              {trackingStatus === "loading" ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  Loading hand tracking…
+                </>
+              ) : trackingStatus === "error" ? (
+                <span className="text-destructive">Hand tracking failed to load</span>
+              ) : live ? (
+                <>
+                  <span aria-hidden>{live.emoji}</span>
+                  {live.label}
+                </>
+              ) : (
+                <>
+                  <Hand className="w-4 h-4 text-primary" />
+                  {handPresent ? "Hand found, make a sign" : "Show your hand"}
+                </>
+              )}
+            </div>
+
+            <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-4 bg-card/95 backdrop-blur rounded-xl px-3 py-2 sm:p-3">
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <span className="text-sm font-medium">Hand Detection</span>
+                <span className="text-sm font-bold text-primary">{confidence.toFixed(0)}%</span>
               </div>
               <Progress value={confidence} className="h-2" />
             </div>
@@ -109,11 +150,27 @@ const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
         )}
       </div>
 
-      {/* Info Footer */}
+      {/* Supported signs */}
       <div className="p-4 border-t">
-        <p className="text-sm text-muted-foreground text-center">
-          Position your hand clearly in front of the camera for best results
+        <p className="text-sm text-muted-foreground text-center mb-3">
+          Hold one of these signs steady for a moment to add it
         </p>
+        <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+          {gestures.map((g) => (
+            <li
+              key={g.id}
+              title={g.label}
+              className={`flex items-center gap-2 rounded-xl px-3 py-2 bg-muted/50 transition-smooth ${
+                g.id === liveGesture ? "ring-2 ring-primary" : ""
+              }`}
+            >
+              <span className="text-lg" aria-hidden>
+                {g.emoji}
+              </span>
+              <span className="leading-snug">{phraseFor(g.id, language)}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

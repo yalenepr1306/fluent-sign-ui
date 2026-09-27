@@ -47,7 +47,8 @@ const SettingsPanel = ({ settings, onSettingsChange }: SettingsPanelProps) => {
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            Used once live gesture recognition is added. The current output is a demo.
+            Six basic hand signs are recognised for now. Full ASL, ISL and BSL vocabularies need a
+            trained sign model.
           </p>
         </div>
 

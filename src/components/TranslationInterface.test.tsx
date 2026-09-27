@@ -1,7 +1,17 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import TranslationInterface from "./TranslationInterface";
 import { defaultSettings } from "@/lib/settings";
+import type { HandFrame } from "@/hooks/use-hand-tracking";
+
+// Replace the camera with a stub so tests can feed hand-tracking frames directly.
+let sendFrame: (frame: HandFrame) => void = () => {};
+vi.mock("./CameraFeed", () => ({
+  default: ({ onHandFrame }: { onHandFrame: (frame: HandFrame) => void }) => {
+    sendFrame = onHandFrame;
+    return null;
+  },
+}));
 
 const renderInterface = (language = "english", onBack = vi.fn()) =>
   render(
@@ -13,50 +23,42 @@ const renderInterface = (language = "english", onBack = vi.fn()) =>
     />,
   );
 
-const tick = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+// Holds a sign for `ms`, sending a frame every 100ms from `start`.
+const hold = (gesture: HandFrame["gesture"], start: number, ms = 1000) => {
+  for (let t = start; t <= start + ms; t += 100) {
+    act(() => sendFrame({ handPresent: gesture !== null, gesture, confidence: 95, timestamp: t }));
+  }
+};
 
 describe("TranslationInterface", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-  });
+  afterEach(cleanup);
 
-  it("adds demo phrases while translating", () => {
+  it("adds a phrase when a sign is held", () => {
     renderInterface();
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    tick(4000);
-    expect(screen.getByText("Hello! How are you?")).toBeTruthy();
-  });
-
-  it("stops on pause and resumes without duplicating phrases", () => {
-    renderInterface();
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    tick(2000);
-    fireEvent.click(screen.getByRole("button", { name: /pause/i }));
-    tick(10000);
+    hold("open_palm", 0);
     expect(screen.getByText("Hello!")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    tick(2000);
-    expect(screen.getByText("Hello! How are you?")).toBeTruthy();
   });
 
-  it("restarts the demo from the first phrase after Clear", () => {
+  it("adds a held sign only once, then again after the hand changes", () => {
     renderInterface();
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    tick(4000);
+    hold("victory", 0, 3000);
+    expect(screen.getByText("Thank you.")).toBeTruthy();
+    hold(null, 3100, 200);
+    hold("victory", 3400);
+    expect(screen.getByText("Thank you. Thank you.")).toBeTruthy();
+  });
+
+  it("uses the chosen output language", () => {
+    renderInterface("hindi");
+    hold("thumbs_up", 0);
+    expect(screen.getByText("हाँ।")).toBeTruthy();
+  });
+
+  it("clears the output", () => {
+    renderInterface();
+    hold("fist", 0);
     fireEvent.click(screen.getByRole("button", { name: /clear/i }));
     expect(screen.getByText(/translated text will appear here/i)).toBeTruthy();
-    tick(2000);
-    expect(screen.getByText("Hello!")).toBeTruthy();
-  });
-
-  it("shows phrases in the chosen output language", () => {
-    renderInterface("spanish");
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    tick(4000);
-    expect(screen.getByText("¡Hola! ¿Cómo estás?")).toBeTruthy();
   });
 
   it("calls onBack instead of reloading", () => {
@@ -64,11 +66,5 @@ describe("TranslationInterface", () => {
     renderInterface("english", onBack);
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
     expect(onBack).toHaveBeenCalledOnce();
-  });
-
-  it("explains when the browser has no camera support", () => {
-    renderInterface();
-    fireEvent.click(screen.getByRole("button", { name: /start translation/i }));
-    expect(screen.getByText(/camera is not supported/i)).toBeTruthy();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CameraFeed from "./CameraFeed";
@@ -6,6 +6,8 @@ import TextOutput from "./TextOutput";
 import ControlPanel from "./ControlPanel";
 import SettingsPanel from "./SettingsPanel";
 import type { Settings as AppSettings } from "@/lib/settings";
+import { GestureStabilizer, phraseFor, type GestureId } from "@/lib/gestures";
+import type { HandFrame } from "@/hooks/use-hand-tracking";
 
 interface TranslationInterfaceProps {
   language: string;
@@ -14,18 +16,12 @@ interface TranslationInterfaceProps {
   onBack: () => void;
 }
 
-// Demo phrases per output language, in the same order across languages.
-const demoPhrases: Record<string, string[]> = {
-  english: ["Hello!", "How are you?", "Thank you.", "Good morning!", "I am fine."],
-  hindi: ["नमस्ते!", "आप कैसे हैं?", "धन्यवाद।", "सुप्रभात!", "मैं ठीक हूँ।"],
-  tamil: ["வணக்கம்!", "நீங்கள் எப்படி இருக்கிறீர்கள்?", "நன்றி.", "காலை வணக்கம்!", "நான் நலமாக இருக்கிறேன்."],
-  spanish: ["¡Hola!", "¿Cómo estás?", "Gracias.", "¡Buenos días!", "Estoy bien."],
-};
-
 const TranslationInterface = ({ language, settings, onSettingsChange, onBack }: TranslationInterfaceProps) => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const demoIndex = useRef(0);
+  const stabilizer = useRef(new GestureStabilizer());
+  const [liveGesture, setLiveGesture] = useState<GestureId | null>(null);
+  const [handPresent, setHandPresent] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -36,37 +32,37 @@ const TranslationInterface = ({ language, settings, onSettingsChange, onBack }: 
 
   const handlePause = () => {
     setIsTranslating(false);
+    stabilizer.current.reset();
+    setLiveGesture(null);
+    setHandPresent(false);
+    setConfidence(0);
   };
 
   const handleClear = () => {
     setTranslatedText("");
     setConfidence(0);
-    demoIndex.current = 0;
+    stabilizer.current.reset();
   };
 
   const handleSwitchCamera = () => {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   };
 
-  // Simulate real-time translation for demo. Runs only while translating and
-  // resumes from where it left off after a pause.
-  useEffect(() => {
-    if (!isTranslating) return;
+  // Called for every analysed camera frame. A sign held steadily adds its phrase once.
+  const handleHandFrame = useCallback(
+    (frame: HandFrame) => {
+      setHandPresent(frame.handPresent);
+      setLiveGesture(frame.gesture);
+      setConfidence(Math.round(frame.confidence));
 
-    const demoWords = demoPhrases[language] ?? demoPhrases.english;
-    const interval = setInterval(() => {
-      if (demoIndex.current >= demoWords.length) {
-        clearInterval(interval);
-        return;
+      const emitted = stabilizer.current.feed(frame.gesture, frame.timestamp);
+      if (emitted) {
+        const phrase = phraseFor(emitted, language);
+        setTranslatedText((prev) => prev + (prev ? " " : "") + phrase);
       }
-      const word = demoWords[demoIndex.current];
-      demoIndex.current++;
-      setTranslatedText((prev) => prev + (prev ? " " : "") + word);
-      setConfidence(Math.random() * 20 + 80); // 80-100% confidence
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isTranslating, language]);
+    },
+    [language],
+  );
 
   return (
     <div className="min-h-screen gradient-soft p-4 md:p-6">
@@ -96,7 +92,15 @@ const TranslationInterface = ({ language, settings, onSettingsChange, onBack }: 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Camera Feed */}
           <div className="fade-in">
-            <CameraFeed confidence={confidence} isActive={isTranslating} facingMode={facingMode} />
+            <CameraFeed
+              confidence={confidence}
+              isActive={isTranslating}
+              facingMode={facingMode}
+              language={language}
+              liveGesture={liveGesture}
+              handPresent={handPresent}
+              onHandFrame={handleHandFrame}
+            />
           </div>
 
           {/* Text Output */}

@@ -11,7 +11,13 @@ interface TranslationInterfaceProps {
   onBack: () => void;
 }
 
-const demoWords = ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"];
+// Demo phrases per output language, in the same order across languages.
+const demoPhrases: Record<string, string[]> = {
+  english: ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"],
+  hindi: ["नमस्ते", "आप कैसे हैं?", "धन्यवाद", "सुप्रभात", "मैं ठीक हूँ"],
+  tamil: ["வணக்கம்", "நீங்கள் எப்படி இருக்கிறீர்கள்?", "நன்றி", "காலை வணக்கம்", "நான் நலமாக இருக்கிறேன்"],
+  spanish: ["Hola", "¿Cómo estás?", "Gracias", "Buenos días", "Estoy bien"],
+};
 
 const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) => {
   const [isTranslating, setIsTranslating] = useState(false);
@@ -56,6 +62,7 @@ const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) =
   useEffect(() => {
     if (!isTranslating) return;
 
+    const demoWords = demoPhrases[language] ?? demoPhrases.english;
     const interval = setInterval(() => {
       if (demoIndex.current >= demoWords.length) {
         clearInterval(interval);
@@ -68,7 +75,7 @@ const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) =
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isTranslating]);
+  }, [isTranslating, language]);
 
   return (
     <div className="min-h-screen gradient-soft p-4 md:p-6">

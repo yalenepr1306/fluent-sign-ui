@@ -6,9 +6,10 @@ interface ControlPanelProps {
   onStart: () => void;
   onPause: () => void;
   onClear: () => void;
+  onSwitchCamera: () => void;
 }
 
-const ControlPanel = ({ isTranslating, onStart, onPause, onClear }: ControlPanelProps) => {
+const ControlPanel = ({ isTranslating, onStart, onPause, onClear, onSwitchCamera }: ControlPanelProps) => {
   return (
     <div className="bg-card rounded-3xl shadow-medium p-6">
       <div className="flex flex-wrap items-center justify-center gap-4">
@@ -45,8 +46,9 @@ const ControlPanel = ({ isTranslating, onStart, onPause, onClear }: ControlPanel
           Clear
         </Button>
 
-        {/* Switch Camera Button (placeholder) */}
+        {/* Switch Camera Button */}
         <Button
+          onClick={onSwitchCamera}
           size="lg"
           variant="outline"
           className="h-16 px-8 text-lg shadow-soft hover:shadow-medium transition-smooth"

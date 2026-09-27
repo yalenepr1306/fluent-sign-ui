@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CameraFeed from "./CameraFeed";
@@ -10,8 +10,12 @@ interface TranslationInterfaceProps {
   language: string;
 }
 
+const demoWords = ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"];
+
 const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
   const [isTranslating, setIsTranslating] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const demoIndex = useRef(0);
   const [translatedText, setTranslatedText] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -24,7 +28,6 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
 
   const handleStart = () => {
     setIsTranslating(true);
-    simulateTranslation();
   };
 
   const handlePause = () => {
@@ -34,27 +37,35 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
   const handleClear = () => {
     setTranslatedText("");
     setConfidence(0);
+    demoIndex.current = 0;
+  };
+
+  const handleSwitchCamera = () => {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   };
 
   const handleBack = () => {
     window.location.reload();
   };
 
-  // Simulate real-time translation for demo
-  const simulateTranslation = () => {
-    const demoWords = ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"];
-    let index = 0;
-    
+  // Simulate real-time translation for demo. Runs only while translating and
+  // resumes from where it left off after a pause.
+  useEffect(() => {
+    if (!isTranslating) return;
+
     const interval = setInterval(() => {
-      if (index < demoWords.length) {
-        setTranslatedText((prev) => prev + (prev ? " " : "") + demoWords[index]);
-        setConfidence(Math.random() * 20 + 80); // 80-100% confidence
-        index++;
-      } else {
+      if (demoIndex.current >= demoWords.length) {
         clearInterval(interval);
+        return;
       }
+      const word = demoWords[demoIndex.current];
+      demoIndex.current++;
+      setTranslatedText((prev) => prev + (prev ? " " : "") + word);
+      setConfidence(Math.random() * 20 + 80); // 80-100% confidence
     }, 2000);
-  };
+
+    return () => clearInterval(interval);
+  }, [isTranslating]);
 
   return (
     <div className="min-h-screen gradient-soft p-4 md:p-6">
@@ -84,7 +95,7 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Camera Feed */}
           <div className="fade-in">
-            <CameraFeed confidence={confidence} isActive={isTranslating} />
+            <CameraFeed confidence={confidence} isActive={isTranslating} facingMode={facingMode} />
           </div>
 
           {/* Text Output */}
@@ -104,6 +115,7 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
             onStart={handleStart}
             onPause={handlePause}
             onClear={handleClear}
+            onSwitchCamera={handleSwitchCamera}
           />
         </div>
 

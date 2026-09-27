@@ -1,12 +1,64 @@
-import { Camera, Activity } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, CameraOff } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface CameraFeedProps {
   confidence: number;
   isActive: boolean;
+  facingMode: "user" | "environment";
 }
 
-const CameraFeed = ({ confidence, isActive }: CameraFeedProps) => {
+const CameraFeed = ({ confidence, isActive, facingMode }: CameraFeedProps) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Open the camera while active; stop every track when paused, switched or unmounted.
+  useEffect(() => {
+    if (!isActive) return;
+
+    const video = videoRef.current;
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+    setError(null);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Camera is not supported in this browser");
+      return;
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode }, audio: false })
+      .then((mediaStream) => {
+        if (cancelled) {
+          mediaStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = mediaStream;
+        if (video) {
+          video.srcObject = mediaStream;
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const name = err instanceof DOMException ? err.name : "";
+        setError(
+          name === "NotAllowedError"
+            ? "Camera permission was denied"
+            : name === "NotFoundError"
+              ? "No camera was found"
+              : "Could not start the camera"
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((track) => track.stop());
+      if (video) {
+        video.srcObject = null;
+      }
+    };
+  }, [isActive, facingMode]);
+
   return (
     <div className="bg-card rounded-3xl shadow-medium overflow-hidden">
       {/* Header */}
@@ -27,17 +79,20 @@ const CameraFeed = ({ confidence, isActive }: CameraFeedProps) => {
 
       {/* Camera Display Area */}
       <div className="relative aspect-video bg-muted flex items-center justify-center">
-        {isActive ? (
-          <div className="relative w-full h-full bg-gradient-to-br from-primary/10 to-secondary/10">
-            {/* Simulated camera feed with hand detection overlay */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative">
-                <div className="w-48 h-48 border-4 border-primary rounded-2xl opacity-50 animate-pulse"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Activity className="w-24 h-24 text-primary animate-pulse" />
-                </div>
-              </div>
-            </div>
+        {isActive && error ? (
+          <div className="text-center p-8">
+            <CameraOff className="w-16 h-16 text-destructive mx-auto mb-4" />
+            <p className="text-destructive text-lg">{error}</p>
+          </div>
+        ) : isActive ? (
+          <div className="relative w-full h-full bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${facingMode === "user" ? "-scale-x-100" : ""}`}
+            />
             <div className="absolute bottom-4 left-4 right-4 bg-card/95 backdrop-blur rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Gesture Detection</span>

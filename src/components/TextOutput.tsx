@@ -7,9 +7,21 @@ interface TextOutputProps {
   text: string;
   language: string;
   confidence: number;
+  voiceSpeed: string;
+  voicePitch: string;
 }
 
-const TextOutput = ({ text, language, confidence }: TextOutputProps) => {
+const speechLangs: Record<string, string> = {
+  english: "en-US",
+  hindi: "hi-IN",
+  tamil: "ta-IN",
+  spanish: "es-ES",
+};
+
+const speechRates: Record<string, number> = { slow: 0.75, normal: 1, fast: 1.5 };
+const speechPitches: Record<string, number> = { low: 0.7, normal: 1, high: 1.4 };
+
+const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: TextOutputProps) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const { toast } = useToast();
 
@@ -18,8 +30,11 @@ const TextOutput = ({ text, language, confidence }: TextOutputProps) => {
     
     setIsSpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language === "hindi" ? "hi-IN" : language === "tamil" ? "ta-IN" : "en-US";
+    utterance.lang = speechLangs[language] ?? "en-US";
+    utterance.rate = speechRates[voiceSpeed] ?? 1;
+    utterance.pitch = speechPitches[voicePitch] ?? 1;
     utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
     speechSynthesis.speak(utterance);
   };
 

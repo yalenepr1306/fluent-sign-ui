@@ -48,6 +48,12 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
     window.location.reload();
   };
 
+  // Apply dark mode to the whole page; the theme variables live under `.dark` in index.css.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", settings.darkMode);
+    return () => document.documentElement.classList.remove("dark");
+  }, [settings.darkMode]);
+
   // Simulate real-time translation for demo. Runs only while translating and
   // resumes from where it left off after a pause.
   useEffect(() => {
@@ -104,6 +110,8 @@ const TranslationInterface = ({ language }: TranslationInterfaceProps) => {
               text={translatedText}
               language={language}
               confidence={confidence}
+              voiceSpeed={settings.voiceSpeed}
+              voicePitch={settings.voicePitch}
             />
           </div>
         </div>

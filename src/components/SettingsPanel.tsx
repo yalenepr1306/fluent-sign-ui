@@ -22,7 +22,7 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel = ({ settings, onSettingsChange }: SettingsPanelProps) => {
-  const updateSetting = (key: keyof Settings, value: any) => {
+  const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 

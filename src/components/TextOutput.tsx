@@ -1,6 +1,6 @@
 import { Volume2, Copy, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface TextOutputProps {
@@ -24,10 +24,32 @@ const speechPitches: Record<string, number> = { low: 0.7, normal: 1, high: 1.4 }
 const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: TextOutputProps) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const { toast } = useToast();
+  const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  // Stop speaking when the text is cleared or the screen is left.
+  useEffect(() => {
+    if (!speechSupported || text) return;
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  }, [text, speechSupported]);
+
+  useEffect(() => {
+    return () => {
+      if (speechSupported) window.speechSynthesis.cancel();
+    };
+  }, [speechSupported]);
 
   const handleSpeak = () => {
     if (!text) return;
-    
+    if (!speechSupported) {
+      toast({
+        title: "Speech not available",
+        description: "This browser can't read text aloud",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLangs[language] ?? "en-US";
@@ -35,16 +57,24 @@ const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: Text
     utterance.pitch = speechPitches[voicePitch] ?? 1;
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Text copied to clipboard",
-      duration: 2000,
-    });
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied!",
+        description: "Text copied to clipboard",
+        duration: 2000,
+      });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Your browser blocked clipboard access",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -66,7 +96,7 @@ const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: Text
       </div>
 
       {/* Text Display */}
-      <div className="flex-1 p-6 overflow-y-auto">
+      <div className="flex-1 p-6 overflow-y-auto" aria-live="polite">
         {text ? (
           <div className="space-y-4">
             <div className="text-3xl md:text-4xl font-semibold leading-relaxed text-foreground slide-up">
@@ -99,6 +129,8 @@ const TextOutput = ({ text, language, confidence, voiceSpeed, voicePitch }: Text
             disabled={!text}
             variant="outline"
             size="lg"
+            aria-label="Copy text"
+            title="Copy text"
             className="shadow-soft hover:shadow-medium transition-smooth"
           >
             <Copy className="w-5 h-5" />

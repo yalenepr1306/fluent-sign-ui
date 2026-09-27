@@ -28,7 +28,7 @@ const ControlPanel = ({ isTranslating, onStart, onPause, onClear, onSwitchCamera
             onClick={onPause}
             size="lg"
             variant="secondary"
-            className="h-16 px-8 text-lg shadow-soft hover:shadow-medium transition-smooth"
+            className="h-16 px-8 text-lg shadow-soft hover:bg-secondary hover:brightness-95 hover:shadow-medium transition-smooth"
           >
             <Pause className="w-6 h-6 mr-2" />
             Pause

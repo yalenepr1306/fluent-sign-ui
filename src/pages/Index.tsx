@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Languages, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,13 +9,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import TranslationInterface from "@/components/TranslationInterface";
+import { loadLanguage, loadSettings, saveLanguage, saveSettings } from "@/lib/settings";
 
 const Index = () => {
   const [started, setStarted] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const [selectedLanguage, setSelectedLanguage] = useState(loadLanguage);
+  const [settings, setSettings] = useState(loadSettings);
+
+  useEffect(() => saveLanguage(selectedLanguage), [selectedLanguage]);
+  useEffect(() => saveSettings(settings), [settings]);
+
+  // Apply dark mode to the whole page; the theme variables live under `.dark` in index.css.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", settings.darkMode);
+  }, [settings.darkMode]);
 
   if (started) {
-    return <TranslationInterface language={selectedLanguage} onBack={() => setStarted(false)} />;
+    return (
+      <TranslationInterface
+        language={selectedLanguage}
+        settings={settings}
+        onSettingsChange={setSettings}
+        onBack={() => setStarted(false)}
+      />
+    );
   }
 
   return (

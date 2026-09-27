@@ -29,3 +29,4 @@ The dev server runs at http://localhost:8080.
 | `npm run build`     | Build for production into `dist` |
 | `npm run preview`   | Preview the production build     |
 | `npm run lint`      | Run ESLint                       |
+| `npm test`          | Run the tests                    |

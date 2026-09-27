@@ -5,33 +5,30 @@ import CameraFeed from "./CameraFeed";
 import TextOutput from "./TextOutput";
 import ControlPanel from "./ControlPanel";
 import SettingsPanel from "./SettingsPanel";
+import type { Settings as AppSettings } from "@/lib/settings";
 
 interface TranslationInterfaceProps {
   language: string;
+  settings: AppSettings;
+  onSettingsChange: (settings: AppSettings) => void;
   onBack: () => void;
 }
 
 // Demo phrases per output language, in the same order across languages.
 const demoPhrases: Record<string, string[]> = {
-  english: ["Hello", "How are you?", "Thank you", "Good morning", "I am fine"],
-  hindi: ["नमस्ते", "आप कैसे हैं?", "धन्यवाद", "सुप्रभात", "मैं ठीक हूँ"],
-  tamil: ["வணக்கம்", "நீங்கள் எப்படி இருக்கிறீர்கள்?", "நன்றி", "காலை வணக்கம்", "நான் நலமாக இருக்கிறேன்"],
-  spanish: ["Hola", "¿Cómo estás?", "Gracias", "Buenos días", "Estoy bien"],
+  english: ["Hello!", "How are you?", "Thank you.", "Good morning!", "I am fine."],
+  hindi: ["नमस्ते!", "आप कैसे हैं?", "धन्यवाद।", "सुप्रभात!", "मैं ठीक हूँ।"],
+  tamil: ["வணக்கம்!", "நீங்கள் எப்படி இருக்கிறீர்கள்?", "நன்றி.", "காலை வணக்கம்!", "நான் நலமாக இருக்கிறேன்."],
+  spanish: ["¡Hola!", "¿Cómo estás?", "Gracias.", "¡Buenos días!", "Estoy bien."],
 };
 
-const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) => {
+const TranslationInterface = ({ language, settings, onSettingsChange, onBack }: TranslationInterfaceProps) => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const demoIndex = useRef(0);
   const [translatedText, setTranslatedText] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState({
-    signLanguage: "asl",
-    darkMode: false,
-    voiceSpeed: "normal",
-    voicePitch: "normal"
-  });
 
   const handleStart = () => {
     setIsTranslating(true);
@@ -50,12 +47,6 @@ const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) =
   const handleSwitchCamera = () => {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   };
-
-  // Apply dark mode to the whole page; the theme variables live under `.dark` in index.css.
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", settings.darkMode);
-    return () => document.documentElement.classList.remove("dark");
-  }, [settings.darkMode]);
 
   // Simulate real-time translation for demo. Runs only while translating and
   // resumes from where it left off after a pause.
@@ -136,7 +127,7 @@ const TranslationInterface = ({ language, onBack }: TranslationInterfaceProps) =
           <div className="mt-6 fade-in">
             <SettingsPanel
               settings={settings}
-              onSettingsChange={setSettings}
+              onSettingsChange={onSettingsChange}
             />
           </div>
         )}

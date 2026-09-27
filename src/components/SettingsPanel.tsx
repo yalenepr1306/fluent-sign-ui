@@ -8,13 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
-interface Settings {
-  signLanguage: string;
-  darkMode: boolean;
-  voiceSpeed: string;
-  voicePitch: string;
-}
+import type { Settings } from "@/lib/settings";
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -52,6 +46,9 @@ const SettingsPanel = ({ settings, onSettingsChange }: SettingsPanelProps) => {
               <SelectItem value="bsl">British Sign Language (BSL)</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-sm text-muted-foreground">
+            Used once live gesture recognition is added. The current output is a demo.
+          </p>
         </div>
 
         {/* Voice Speed */}
